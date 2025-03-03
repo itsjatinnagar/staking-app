@@ -11,20 +11,25 @@ contract Staker {
 
     mapping(address => uint256) public balances;
     uint256 public constant threshold = 1 ether;
-    uint256 public deadline = block.timestamp + 30 seconds;
+    uint256 public deadline = block.timestamp + 72 hours;
     bool openForWithdraw = false;
 
     constructor(address exampleExternalContractAddress) {
         exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
     }
 
+    modifier notCompleted() {
+        require(!exampleExternalContract.completed());
+        _;
+    }
+
     function stake() public payable {
+        require(timeLeft() > 0, "Deadline Reached");
         balances[msg.sender] += msg.value;
         emit Stake(msg.sender, msg.value);
     }
 
-    function execute() public {
-        require(exampleExternalContract.completed() == false, "Funding Completed");
+    function execute() public notCompleted {
         require(timeLeft() == 0, "Under Deadline");
         if (address(this).balance < threshold) {
             openForWithdraw = true;
@@ -33,7 +38,7 @@ contract Staker {
         }
     }
 
-    function withdraw() public {
+    function withdraw() public notCompleted {
         require(openForWithdraw, "Withdraw Closed");
         uint256 amount = balances[msg.sender];
         require(amount > 0, "Insufficient Balance");
@@ -47,5 +52,7 @@ contract Staker {
         return deadline - block.timestamp;
     }
 
-    // Add the `receive()` special function that receives eth and calls stake()
+    receive() external payable {
+        stake();
+    }
 }
